@@ -26,8 +26,11 @@ if not TUTORIAL_LINK:
 bot = Bot(token=TELEGRAM_TOKEN)
 dispatcher = Dispatcher(bot, None, workers=0)
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+# Set up basic logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
 # Define states for the conversation
@@ -36,7 +39,7 @@ PHOTO, URL, FILE_NAME = range(3)
 # Start command handler
 def start(update: Update, context: CallbackContext) -> int:
     update.message.reply_text("🖼️ Please upload a photo.")
-    logger.debug("Start command invoked")
+    logger.info("Start command invoked")
     return PHOTO
 
 # Receive photo handler
@@ -44,14 +47,14 @@ def receive_photo(update: Update, context: CallbackContext) -> int:
     photo = update.message.photo[-1]  # Get the highest resolution photo
     context.user_data['photo_file_id'] = photo.file_id
     update.message.reply_text("🔗 Please send a URL.")
-    logger.debug("Received photo: %s", photo.file_id)
+    logger.info("Received photo: %s", photo.file_id)
     return URL
 
 # Receive URL handler
 def receive_url(update: Update, context: CallbackContext) -> int:
     context.user_data['url'] = update.message.text
     update.message.reply_text("📝 Please send the file name.")
-    logger.debug("Received URL: %s", update.message.text)
+    logger.info("Received URL: %s", update.message.text)
     return FILE_NAME
 
 # Receive file name and post to channel
@@ -76,15 +79,15 @@ def receive_file_name(update: Update, context: CallbackContext) -> int:
     
     try:
         # Log the message and request URL
-        logger.debug("Posting message to channel %s", CHANNEL_ID)
-        logger.debug("Message text: %s", post_text)
+        logger.info("Posting message to channel %s", CHANNEL_ID)
+        logger.info("Message text: %s", post_text)
         
         # Post photo to channel
         context.bot.send_photo(chat_id=CHANNEL_ID, photo=photo_file_id, caption=post_text, parse_mode='HTML')
         
         # Log response from Telegram
         update.message.reply_text("✅ Your file has been posted to the channel!")
-        logger.debug("Message posted to channel %s", CHANNEL_ID)
+        logger.info("Message posted to channel %s", CHANNEL_ID)
         
     except Exception as e:
         # Log the error with more details
@@ -97,7 +100,7 @@ def receive_file_name(update: Update, context: CallbackContext) -> int:
 # Cancel command handler
 def cancel(update: Update, context: CallbackContext) -> int:
     update.message.reply_text('❌ Operation canceled.')
-    logger.debug("Operation canceled by user")
+    logger.info("Operation canceled by user")
     return ConversationHandler.END
 
 # Set up conversation handler
@@ -120,7 +123,7 @@ def webhook():
     try:
         update = Update.de_json(request.get_json(force=True), bot)
         dispatcher.process_update(update)
-        logger.debug("Webhook received update: %s", request.get_json(force=True))
+        logger.info("Webhook received update: %s", request.get_json(force=True))
         return 'ok', 200
     except Exception as e:
         logger.error("Error processing webhook update: %s", e, exc_info=True)
@@ -145,7 +148,7 @@ def setup_webhook():
             data={'url': WEBHOOK_URL}
         )
         if response.json().get('ok'):
-            logger.debug("Webhook setup successful")
+            logger.info("Webhook setup successful")
             return "Webhook setup ok"
         else:
             logger.error("Webhook setup failed: %s", response.json())
@@ -155,4 +158,4 @@ def setup_webhook():
         return "Webhook setup failed"
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run(port=5000, debug=True)
