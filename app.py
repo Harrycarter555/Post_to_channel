@@ -31,12 +31,20 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Define states for the conversation
-URL, FILE_NAME = range(2)
+PHOTO, URL, FILE_NAME = range(3)
 
 # Start command handler
 def start(update: Update, context: CallbackContext) -> int:
-    update.message.reply_text("🔗 Please send a URL.")
+    update.message.reply_text("🖼️ Please upload a photo.")
     logger.debug("Start command invoked")
+    return PHOTO
+
+# Receive photo handler
+def receive_photo(update: Update, context: CallbackContext) -> int:
+    photo = update.message.photo[-1]  # Get the highest resolution photo
+    context.user_data['photo_file_id'] = photo.file_id
+    update.message.reply_text("🔗 Please send a URL.")
+    logger.debug("Received photo: %s", photo.file_id)
     return URL
 
 # Receive URL handler
@@ -50,7 +58,8 @@ def receive_url(update: Update, context: CallbackContext) -> int:
 def receive_file_name(update: Update, context: CallbackContext) -> int:
     file_name = update.message.text
     url = context.user_data['url']
-    
+    photo_file_id = context.user_data['photo_file_id']
+
     # Post format preparation (HTML Text for bold and italic)
     post_text = f"""
     📂 File Name:
@@ -70,13 +79,12 @@ def receive_file_name(update: Update, context: CallbackContext) -> int:
         logger.debug("Posting message to channel %s", CHANNEL_ID)
         logger.debug("Message text: %s", post_text)
         
-        # Post to channel with HTML parse mode
-        response = context.bot.send_message(chat_id=CHANNEL_ID, text=post_text, parse_mode='HTML')
+        # Post photo to channel
+        context.bot.send_photo(chat_id=CHANNEL_ID, photo=photo_file_id, caption=post_text, parse_mode='HTML')
         
         # Log response from Telegram
         update.message.reply_text("✅ Your file has been posted to the channel!")
         logger.debug("Message posted to channel %s", CHANNEL_ID)
-        logger.debug("Response from Telegram: %s", response)
         
     except Exception as e:
         # Log the error with more details
@@ -96,6 +104,7 @@ def cancel(update: Update, context: CallbackContext) -> int:
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler('start', start)],
     states={
+        PHOTO: [MessageHandler(Filters.photo & ~Filters.command, receive_photo)],
         URL: [MessageHandler(Filters.text & ~Filters.command, receive_url)],
         FILE_NAME: [MessageHandler(Filters.text & ~Filters.command, receive_file_name)],
     },
